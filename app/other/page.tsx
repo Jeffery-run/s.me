@@ -7,7 +7,7 @@ const page = memo(() => {
   const router = useRouter();
   useEffect(() => {
     router.push('/other/piecesSlider');
-  }, []);
+  }, [router]);
 
   return <div />;
 });

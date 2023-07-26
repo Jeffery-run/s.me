@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 function ThemeSwitch({ className } : { className:string }) {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
-  useEffect(() => setMounted(true),[]);
+  useEffect(() => setMounted(true), []);
   return (
     <button
       type="button"
