@@ -1,0 +1,63 @@
+---
+title: "source-map"
+date: 2023-06-21
+tags: ["webpack"]
+draft: false
+summary: "webpack中sourcemap配置.😉😉😉"
+---
+
+## sourcemap 简介
+
+sourcemap 通过一种方式将压缩后的文件中的代码映射到源文件中的位置。
+
+有了sourcemap, 即使代码被优化、压缩以后，也可以很容易的进行debug。
+
+浏览器开发者工具内置对sourcemap 的支持。
+
+```js
+// 通过在源文件末尾添加注释告诉浏览器 可以获取 source map 文件。
+//# sourceMappingURL=<url>
+```
+
+## webpack sourcemap 配置
+
+devtool 中配置sourcemap。
+
+不同的配置构建速度不同。
+
+1. eval-source-map
+
+   sourcemap 以 DataUrl 添加到 eval 函数的后面。
+
+2. inline-source-map
+
+   sourcemap 以 DataUrl 添加到源文件的后面。
+
+3. cheap-source-map
+
+   生成的 sourcemap 没有列映射，更加高效。
+
+   开发中错误信息通常只需要定位到行。
+
+4. cheap-module-source-map
+
+   使用 loader 处理文件，会把空行删掉导致 sourcemap 映射不准确。使用 cheap-module-source-map 可以避免这个问题。
+
+5. hidden-source-map
+
+   会生成 sourcemap 但是不会引用。
+
+6. nosources-source-map
+
+   会生成sourcemap, 但是自由错误信息，不会生成源代码文件。
+
+这几个值可以组合起来使用。
+
+```js
+[inline-|hidden-|eval-][nosources-][cheap-[module-]]source-map
+```
+
+开发阶段 推荐使用 cheap-module-source-map
+
+发布阶段 关闭sourcemap
+

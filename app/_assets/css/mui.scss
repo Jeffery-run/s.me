@@ -1,0 +1,29 @@
+.MuiFormControl-root{
+  margin:0 auto;
+  .MuiFormLabel-root{
+    color: var(--bg-scroll);
+  }
+  .MuiInputBase-root{
+    .MuiOutlinedInput-notchedOutline{
+      border-color: var(--bg-scroll);
+    }
+    &:hover{
+      .MuiOutlinedInput-notchedOutline{
+        border-color: var(--bg-scroll);
+      }
+    }
+    &.Mui-focused{
+      .MuiOutlinedInput-notchedOutline{
+        border-color: var(--bg-scroll);
+      }
+    }
+    .MuiInputBase-input{
+      color: var(--bg-scroll);
+      background-color: transparent;
+      &:focus{
+        box-shadow: none;
+      }
+    }
+  }
+
+}

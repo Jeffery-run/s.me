@@ -1,0 +1,200 @@
+---
+title: treeshaking
+date: 2023-06-21
+tags: ["webpack"]
+draft: false
+summary: 移除项目中不必要代码。
+---
+
+<TOCInline toc={props.toc} />
+## 什么是treeshaking
+
+treeshaking 可以理解为移除包中不可达的代码。
+
+>You can imagine your application as a tree. The source code and libraries you actually use represent the green, living leaves of the tree. Dead code represents the brown, dead leaves of the tree that are consumed by autumn. In order to get rid of the dead leaves, you have to shake the tree, causing them to fall.
+
+## usedexports
+
+```js
+// 值类型
+boolean = true string: 'global'
+```
+
+usedexports 在webpack.config.js中配置, production 模式下 usedExports 默认是 true, development 模式下默认是false。
+
+使用webpack搭建一个简单的项目, src 目录下创建 index.js 和 math.js 文件, 添加webpack.config.js文件。
+
+```js
+// index.js
+import { square } from "./math";
+
+square.foo();
+
+console.log(square(3));
+```
+
+```js
+// math.js
+export function cube(x){
+  return x * x * x;
+}
+
+export function square(x){
+  return x * x;
+}
+
+```
+
+
+
+```js
+// webpack.config.js
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require("path");
+module.exports = {
+  mode:"development",
+  devtool:"source-map",
+  output:{
+    clean:true,
+  },
+  plugins:[
+    new HtmlWebpackPlugin({
+      template:path.resolve(__dirname, "index.html")
+    }),
+  ],
+}
+
+```
+
+package.json中添加执行命令
+
+```json
+{
+    "build": "webpack",
+}
+```
+
+这时候执行 npm run build , 可以看到没有使用的 cube 函数也被打包。
+
+![1.jpg](/blog/treeshaking/01.png)
+
+webpack 配置中添加 
+
+```js
+optimization:{
+    usedExports: true,
+},
+```
+
+再次执行打包, 可以看到 cube 函数已经被移除。
+
+![2.png](/blog/treeshaking/02.png)
+
+但是函数体仍然在打包后的文件中，这里是因为mode 是development。如果mode 是production, webpack 会在打包时使用 terser-webpack-plugin 对代码进行压缩、优化，cube 函数的函数体就会被移除。
+
+可以在 development 模式手动添加 terser-webpack-plugin 看下效果。
+
+```js
+// 安装 terser-webpack-plugin, webpack.config.js中添加plugin
+const TerserPlugin = require("terser-webpack-plugin");
+
+module.exports = {
+  plugins:[
+    new TerserPlugin({ 
+      extractComments: false, // 移除注释
+      terserOptions:{
+        format:{
+          comments: false, // 移除注释
+        },
+        mangle: false, // 跳过压缩名称
+      }
+    }),
+  ],
+}
+
+```
+
+再次打包可以看到，只有square 函数的代码被保留。
+
+![3.png](/blog/treeshaking/03.png)
+
+## sideEffect
+
+作用: 如果从一个被标记为没有副作用的模块中直接导出的值没有被使用，webpack 可以跳过评估这个模块的副作用。
+
+```js
+import "./abc.js";
+// 如果项目中有这样的代码，因为不确定 adc.js 是否有副作用， webpack会把整个 abc.js 文件打包。
+// 通过 sideEffect 字段可以提示 webpack 是否可以移除 abc.js 文件。
+```
+
+在package.json中添加 sideEffects 字段，可以告诉webpack 怎样处理导入的整个文件。
+
+设置 false, 表示所有的代码不包含副作用，可以安全的移除。
+
+如果有些文件需要使用， 可以设置一个数组:
+
+```json
+{
+  "sideEffects": ["*.css", "tj.js"]
+}
+```
+
+
+
+## more
+
+sideEffects 和 usedExports 优化是两个不同的东西。
+
+sideEffects 允许跳过整个 模块/文件 和相关依赖，所以更高效。
+
+usedExports 依赖 terser 来检测副作用。
+
+
+
+假如有这样的代码：
+
+```js
+// info.js
+const info = {
+  name:"why",
+  age:16
+};
+
+function getValue(info){
+  return info.name + "constant value"
+}
+
+const value = getValue(info);
+
+export {
+	info, value
+}
+```
+
+```js
+// index.js
+import { info } from "./info.js";
+
+console.log(info);
+```
+
+
+
+ 即使配置了usedExports : true ， terser 无法判断 getValue 函数是否有副作用（getter），getValue 函数还是会被打包。可以看到打包后的代码中立即执行函数访问了 info 的那么属性。
+
+![4.png](/blog/treeshaking/04.png)
+
+可以通过添加 /\*#\_\_PURE\_\_\*/ 注释告诉 terser 函数的调用没有副作用，可以移除。
+
+```js
+const value = /*#__PURE__*/ getValue(info);
+```
+
+打包结果:
+
+![5.png](/blog/treeshaking/05.png)
+
+更多内容查看官网 [https://webpack.js.org/guides/tree-shaking/#root](https://webpack.js.org/guides/tree-shaking/#root)。
+

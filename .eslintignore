@@ -1,0 +1,10 @@
+dist/
+node_modules
+node_modules/
+types/
+cache/
+.eslintrc.json
+!.test
+.temp
+**/*.md
+**/*.mdx

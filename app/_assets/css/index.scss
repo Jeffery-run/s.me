@@ -1,0 +1,9 @@
+@import "./mui.scss";
+@import "./globals.scss";
+
+/* Media queries with styles for smaller screens */
+@media screen and (max-width: 720px) {
+	.pieces_image {
+		max-width: 300px;
+	}
+}

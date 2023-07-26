@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-color: #fff;
+  --bg-scroll:rgb(158, 165, 168);
+  --bg-selection:#79ffe1;
+  --radius-pill:200px;
+  --color: #000;
+  --color-selection: #000;
+  --color-title: #000;
+  --color-shadow: #334155;
+
+   /** Gradient colors */
+   --gradient-1: linear-gradient(90deg, #0ea5ea, #0bd1d1 51%);
+   --gradient-2: linear-gradient(90deg, #0ea5ea, #0bd1d1 51%, #0ea5ea);
+   --gradient-3: linear-gradient(0deg, #000d1a, transparent);
+
+  /** Font weight */
+  --weight-medium: 500;
+  --weight-semiBold: 600;
+  --weight-bold: 700;
+  --weight-extraBold: 800;
+}
+
+[data-theme='dark'] {
+  --background-color: hsla(222, 47%, 11%, 1);
+  --bg-scroll:hsla(199, 89%, 49%, 1);
+  --bg-selection:#96dfbe;
+  --color: #fff;
+  --color-selection: #000;
+  --color-title: #2fb7f7;
+  --color-shadow: rgb(53, 144, 230);
+}
+
+body{
+  background-color: var(--background-color);
+  color:var(--color);
+}
+
+::-webkit-scrollbar { width: 5px; }
+
+::-webkit-scrollbar-track { background-color: transparent; }
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--bg-scroll);
+  border-radius: var(--radius-pill);
+}
+::selection{
+  background-color: var(--bg-selection);
+  color: var(--color-selection);
+}
+
+hr{
+  display: none;
+}

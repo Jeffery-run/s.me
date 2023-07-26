@@ -1,0 +1,908 @@
+---
+title : "tapable"
+date : "2023-07-09"
+tags : ["webpack"]
+draft : false
+summary : wepback核心tapable.
+---
+
+
+
+## tapable 
+
+官网地址： [https://github.com/webpack/tapable](https://github.com/webpack/tapable)
+
+<TOCInline toc={props.toc} exclude="Overview" toHeading={2} />
+
+## 基本使用
+
+```js
+import { SyncHook } from "tapable";
+class Car{
+  constructor(){
+    this.hooks = {
+      sync:new SyncHook(["name", "age", "gender"]), // 指定回调函数的参数个数
+    };
+  }
+  callSync(name,age,gender){
+    this.hooks.sync.call(name,age,gender);
+  }
+}
+const myCar = new Car();
+
+myCar.hooks.sync.tap("sync plugin", (name,age,gender)=> console.log("sync plugin", name,age,gender));
+myCar.callSync("why", 18, "male");
+// output:
+// sync plugin why 18 male
+```
+
+tapable 提供了 11 种hook, 包括同步 hook 和异步 hook。
+
+同步 hook 只能用 tap 方法添加插件, 异步 hook 也可以用 tapPromise, tapAsync 方法添加插件。
+
+异步 hook 只能使用 callAsync 或 promise 调用插件。
+
+## hook types
+
+hook 可以分成四种类型
+
+* 基本类型 : 不带waterfall, bail 或者 loop 的hook。
+* waterfall: 上一个插件执行的返回值会传给下一个插件。
+* bail: 调用的插件有返回值时， 剩下的插件不会执行。
+* loop: 如果有一个插件返回一个不是 undefined 的值，loophook 调用的插件会循环执行直到返回undefined。
+
+```js
+// waterfall
+class Car{
+  constructor(){
+    this.hooks = {
+      sync:new SyncWaterfallHook(["name"]),
+    };
+  }
+  callSync(name){
+    this.hooks.sync.call(name);
+  }
+}
+
+const myCar = new Car();
+
+myCar.hooks.sync.tap("sync1", (params)=> {
+  console.log(params);
+  return params + "__sync1";
+});
+
+myCar.hooks.sync.tap("sync2", (params)=> {
+  console.log(params);
+  return params + "__sync2";
+});
+
+myCar.callSync("why");
+// 输出
+// why
+// why__sync1
+```
+
+```js
+// bailhook
+class Car{
+  constructor(){
+    this.hooks = {
+      sync:new SyncBailHook(["name"]),
+    };
+  }
+  callSync(name){
+    this.hooks.sync.call(name);
+  }
+}
+
+const myCar = new Car();
+
+myCar.hooks.sync.tap("sync1", (params)=> {
+  console.log(params);
+  return params;
+});
+
+myCar.hooks.sync.tap("sync2", (params)=> {
+  console.log(params);
+  return params + "__sync2";
+});
+
+myCar.callSync("why");
+// 输出
+// why
+```
+
+
+
+```js
+// loophook
+class Car{
+  constructor(){
+    this.hooks = {
+      sync:new SyncLoopHook(["name"]),
+    };
+  }
+  callSync(name){
+    this.hooks.sync.call(name);
+  }
+}
+
+const myCar = new Car();
+
+let count = 0;
+let str = "";
+myCar.hooks.sync.tap("bail hook", (name)=> {
+  count += 1;
+  console.log(name, count);
+  if(count < 2){
+    return count;
+  }
+});
+myCar.hooks.sync.tap("bail hook2", (name)=> {
+  str += "_str_";
+  console.log(name, str)
+  if(str.length < 10){
+    return str;
+  }
+});
+myCar.callSync("why");
+// 输出
+// why 1
+// why 2
+// why _str_
+// why 3
+// why _str__str_
+```
+
+## interception
+
+每种 hook 都有 interception 方法.
+
+*  register : hook添加的每一个插件会传进这个函数里，允许修改添加的插件。
+* call : 每次插件执行时都会调用call 方法，call 方法中可以访问插件的参数。
+* tap : 每个插件执行前都会调用 tap 方法，tap 方法中可以访问将要执行的插件。
+* loop : 每次循环执行插件时都会调用 loop 方法。
+
+## context
+
+context 将被移除，不建议使用。
+
+## source code
+
+tapable中主要有两个类 Hook 和  HookCodeFactory。
+
+所有的 hook 都是基于 Hook 类实现。HookCodeFactory 负责生成 hook 触发时执行的函数。
+
+```js
+// SyncHook 代码
+const Hook = require("./Hook");
+const HookCodeFactory = require("./HookCodeFactory");
+
+class SyncHookCodeFactory extends HookCodeFactory {
+    // 生成函数体
+	content({ onError, onDone, rethrowIfPossible }) {
+		return this.callTapsSeries({
+			onError: (i, err) => onError(err),
+			onDone,
+			rethrowIfPossible
+		});
+	}
+}
+
+const factory = new SyncHookCodeFactory();
+
+const TAP_ASYNC = () => {
+	throw new Error("tapAsync is not supported on a SyncHook");
+};
+
+const TAP_PROMISE = () => {
+	throw new Error("tapPromise is not supported on a SyncHook");
+};
+
+const COMPILE = function(options) {
+    // hook 实例上添加 _x 内部属性， 生成的函数调用时会用到
+	factory.setup(this, options);
+	return factory.create(options); // 调用factory.create 生成函数,然后返回
+};
+
+function SyncHook(args = [], name = undefined) {
+	const hook = new Hook(args, name);
+	hook.constructor = SyncHook;
+	hook.tapAsync = TAP_ASYNC; // 同步 hook 调用 tapAsync 方法 和 tapPromise 就会报错
+	hook.tapPromise = TAP_PROMISE;
+	hook.compile = COMPILE;
+	return hook;
+}
+
+SyncHook.prototype = null;
+
+module.exports = SyncHook;
+```
+
+```js
+// AsyncSeriesHook 代码
+const Hook = require("./Hook");
+const HookCodeFactory = require("./HookCodeFactory");
+
+class AsyncSeriesHookCodeFactory extends HookCodeFactory {
+	content({ onError, onDone }) {
+		return this.callTapsSeries({
+			onError: (i, err, next, doneBreak) => onError(err) + doneBreak(true),
+			onDone
+		});
+	}
+}
+
+const factory = new AsyncSeriesHookCodeFactory();
+
+const COMPILE = function(options) {
+	factory.setup(this, options);
+	return factory.create(options);
+};
+
+function AsyncSeriesHook(args = [], name = undefined) {
+	const hook = new Hook(args, name);
+	hook.constructor = AsyncSeriesHook;
+	hook.compile = COMPILE;
+	hook._call = undefined;
+	hook.call = undefined; // 异步 hook 不能使用 call 方法来触发
+	return hook;
+}
+
+AsyncSeriesHook.prototype = null;
+
+module.exports = AsyncSeriesHook;
+```
+
+```js
+// Hook 类代码
+const util = require("util");
+
+const deprecateContext = util.deprecate(() => {},
+"Hook.context is deprecated and will be removed");
+
+const CALL_DELEGATE = function(...args) {
+	this.call = this._createCall("sync");
+	return this.call(...args);
+};
+const CALL_ASYNC_DELEGATE = function(...args) {
+	this.callAsync = this._createCall("async");
+	return this.callAsync(...args);
+};
+const PROMISE_DELEGATE = function(...args) {
+	this.promise = this._createCall("promise");
+	return this.promise(...args);
+};
+
+class Hook {
+	constructor(args = [], name = undefined) {
+		this._args = args;
+		this.name = name;
+		this.taps = [];
+		this.interceptors = [];
+		this._call = CALL_DELEGATE;
+		this.call = CALL_DELEGATE; // call 方法
+		this._callAsync = CALL_ASYNC_DELEGATE;
+		this.callAsync = CALL_ASYNC_DELEGATE; // callAsync 方法
+		this._promise = PROMISE_DELEGATE;
+		this.promise = PROMISE_DELEGATE; // promise 方法
+		this._x = undefined;
+
+		this.compile = this.compile;
+		this.tap = this.tap;
+		this.tapAsync = this.tapAsync;
+		this.tapPromise = this.tapPromise;
+	}
+
+	compile(options) {
+		throw new Error("Abstract: should be overridden");
+	}
+
+	_createCall(type) {
+		return this.compile({
+			taps: this.taps,
+			interceptors: this.interceptors,
+			args: this._args,
+			type: type
+		});
+	}
+
+	_tap(type, options, fn) {
+		// 字符串
+		if (typeof options === "string") {
+			options = {
+				name: options.trim()
+			};
+			// 不是对象 || null
+		} else if (typeof options !== "object" || options === null) {
+			throw new Error("Invalid tap options");
+		}
+		// 没有 name 属性
+		if (typeof options.name !== "string" || options.name === "") {
+			throw new Error("Missing name for tap");
+		}
+		// 警告 移除context 属性
+		if (typeof options.context !== "undefined") {
+			deprecateContext();
+		}
+		options = Object.assign({ type, fn }, options);
+		// 拦截器注册option
+		options = this._runRegisterInterceptors(options);
+		// 插入option
+		this._insert(options);
+	}
+
+	tap(options, fn) {
+		this._tap("sync", options, fn);
+	}
+
+	tapAsync(options, fn) {
+		this._tap("async", options, fn);
+	}
+
+	tapPromise(options, fn) {
+		this._tap("promise", options, fn);
+	}
+	// 调用拦截器的 register 方法， 可以通过拦截器修改 tap
+	_runRegisterInterceptors(options) {
+		for (const interceptor of this.interceptors) {
+			if (interceptor.register) {
+				const newOptions = interceptor.register(options);
+				if (newOptions !== undefined) {
+					options = newOptions;
+				}
+			}
+		}
+		return options;
+	}
+
+	withOptions(options) {
+		const mergeOptions = opt =>
+			Object.assign({}, options, typeof opt === "string" ? { name: opt } : opt);
+
+		return {
+			name: this.name,
+			tap: (opt, fn) => this.tap(mergeOptions(opt), fn),
+			tapAsync: (opt, fn) => this.tapAsync(mergeOptions(opt), fn),
+			tapPromise: (opt, fn) => this.tapPromise(mergeOptions(opt), fn),
+			intercept: interceptor => this.intercept(interceptor),
+			isUsed: () => this.isUsed(),
+			withOptions: opt => this.withOptions(mergeOptions(opt))
+		};
+	}
+
+	isUsed() {
+		return this.taps.length > 0 || this.interceptors.length > 0;
+	}
+	// 添加拦截器
+	intercept(interceptor) {
+		this._resetCompilation();
+		this.interceptors.push(Object.assign({}, interceptor));
+		if (interceptor.register) {
+			for (let i = 0; i < this.taps.length; i++) {
+				this.taps[i] = interceptor.register(this.taps[i]);
+			}
+		}
+	}
+	// 清除call, callAsync, promise 的缓存, 在添加拦截器 和 插入 tap 后调用
+	_resetCompilation() {
+		this.call = this._call;
+		this.callAsync = this._callAsync;
+		this.promise = this._promise;
+	}
+
+	// tap 方法插入option, 会通过 item 的 before 和 stage 属性对 taps 进行排序
+	_insert(item) {
+		// 重置compilation
+		this._resetCompilation();
+		let before;
+		// option.before
+		if (typeof item.before === "string") {
+			before = new Set([item.before]);
+		} else if (Array.isArray(item.before)) {
+			before = new Set(item.before);
+		}
+		let stage = 0;
+		// option.stage
+		if (typeof item.stage === "number") {
+			stage = item.stage;
+		}
+		let i = this.taps.length;
+		while (i > 0) {
+			i--;
+			const x = this.taps[i];
+			this.taps[i + 1] = x;
+			const xStage = x.stage || 0;
+			if (before) {
+				// 之前的 tap 中有 name属性 在before中，删除before
+				if (before.has(x.name)) {
+					before.delete(x.name);
+					continue;
+				}
+				// before 中有值
+				if (before.size > 0) {
+					continue;
+				}
+			}
+			if (xStage > stage) {
+				continue;
+			}
+			i++;
+			break;
+		}
+		this.taps[i] = item;
+	}
+}
+
+Object.setPrototypeOf(Hook.prototype, null);
+
+module.exports = Hook;
+```
+
+```js
+// HookCodeFactory 类 实现
+class HookCodeFactory {
+	constructor(config) {
+		this.config = config;
+		this.options = undefined;
+		this._args = undefined;
+	}
+	// create 方法生成 Hook类 实例 call、callAsync、promise 方法调用时使用的函数
+	create(options) {
+		this.init(options);
+		let fn;
+		switch (this.options.type) {
+			case "sync":
+				fn = new Function(
+					this.args(),
+					'"use strict";\n' +
+						this.header() +
+						this.contentWithInterceptors({
+							onError: err => `throw ${err};\n`,
+							onResult: result => `return ${result};\n`,
+							resultReturns: true,
+							onDone: () => "",
+							rethrowIfPossible: true
+						})
+				);
+				break;
+			case "async":
+				fn = new Function(
+					this.args({
+						after: "_callback"
+					}),
+					'"use strict";\n' +
+						this.header() +
+						this.contentWithInterceptors({
+							onError: err => `_callback(${err});\n`,
+							onResult: result => `_callback(null, ${result});\n`,
+							onDone: () => "_callback();\n"
+						})
+				);
+				break;
+			case "promise":
+				let errorHelperUsed = false;
+				const content = this.contentWithInterceptors({
+					onError: err => {
+						errorHelperUsed = true;
+						return `_error(${err});\n`;
+					},
+					onResult: result => `_resolve(${result});\n`,
+					onDone: () => "_resolve();\n"
+				});
+				let code = "";
+				code += '"use strict";\n';
+				code += this.header();
+				code += "return new Promise((function(_resolve, _reject) {\n";
+				if (errorHelperUsed) {
+					code += "var _sync = true;\n";
+					code += "function _error(_err) {\n";
+					code += "if(_sync)\n";
+					code +=
+						"_resolve(Promise.resolve().then((function() { throw _err; })));\n";
+					code += "else\n";
+					code += "_reject(_err);\n";
+					code += "};\n";
+				}
+				code += content;
+				if (errorHelperUsed) {
+					code += "_sync = false;\n";
+				}
+				code += "}));\n";
+				fn = new Function(this.args(), code);
+				break;
+		}
+		this.deinit();
+		return fn;
+	}
+
+	setup(instance, options) {
+        // Hook 类实例添加 _x 属性，调用生成的方法时会用到
+		instance._x = options.taps.map(t => t.fn);
+	}
+
+	/**
+	 * @param {{ type: "sync" | "promise" | "async", taps: Array<Tap>, interceptors: Array<Interceptor> }} options
+	 */
+	init(options) {
+		this.options = options;
+		this._args = options.args.slice();
+	}
+
+	deinit() {
+		this.options = undefined;
+		this._args = undefined;
+	}
+
+	contentWithInterceptors(options) {
+		if (this.options.interceptors.length > 0) {
+			const onError = options.onError;
+			const onResult = options.onResult;
+			const onDone = options.onDone;
+			let code = "";
+			for (let i = 0; i < this.options.interceptors.length; i++) {
+				const interceptor = this.options.interceptors[i];
+				if (interceptor.call) {
+					code += `${this.getInterceptor(i)}.call(${this.args({
+						before: interceptor.context ? "_context" : undefined
+					})});\n`;
+				}
+			}
+			code += this.content(
+				Object.assign(options, {
+					onError:
+						onError &&
+						(err => {
+							let code = "";
+							for (let i = 0; i < this.options.interceptors.length; i++) {
+								const interceptor = this.options.interceptors[i];
+								if (interceptor.error) {
+									code += `${this.getInterceptor(i)}.error(${err});\n`;
+								}
+							}
+							code += onError(err);
+							return code;
+						}),
+					onResult:
+						onResult &&
+						(result => {
+							let code = "";
+							for (let i = 0; i < this.options.interceptors.length; i++) {
+								const interceptor = this.options.interceptors[i];
+								if (interceptor.result) {
+									code += `${this.getInterceptor(i)}.result(${result});\n`;
+								}
+							}
+							code += onResult(result);
+							return code;
+						}),
+					onDone:
+						onDone &&
+						(() => {
+							let code = "";
+							for (let i = 0; i < this.options.interceptors.length; i++) {
+								const interceptor = this.options.interceptors[i];
+								if (interceptor.done) {
+									code += `${this.getInterceptor(i)}.done();\n`;
+								}
+							}
+							code += onDone();
+							return code;
+						})
+				})
+			);
+			return code;
+		} else {
+			return this.content(options);
+		}
+	}
+	// 生成函数头部
+	header() {
+		let code = "";
+		if (this.needContext()) {
+			code += "var _context = {};\n";
+		} else {
+			code += "var _context;\n";
+		}
+		code += "var _x = this._x;\n";
+		if (this.options.interceptors.length > 0) {
+			code += "var _taps = this.taps;\n";
+			code += "var _interceptors = this.interceptors;\n";
+		}
+		return code;
+	}
+
+	needContext() {
+		for (const tap of this.options.taps) if (tap.context) return true;
+		return false;
+	}
+
+	callTap(tapIndex, { onError, onResult, onDone, rethrowIfPossible }) {
+		let code = "";
+		let hasTapCached = false;
+		for (let i = 0; i < this.options.interceptors.length; i++) {
+			const interceptor = this.options.interceptors[i];
+			if (interceptor.tap) {
+				if (!hasTapCached) {
+					code += `var _tap${tapIndex} = ${this.getTap(tapIndex)};\n`;
+					hasTapCached = true;
+				}
+				code += `${this.getInterceptor(i)}.tap(${
+					interceptor.context ? "_context, " : ""
+				}_tap${tapIndex});\n`;
+			}
+		}
+		code += `var _fn${tapIndex} = ${this.getTapFn(tapIndex)};\n`;
+		const tap = this.options.taps[tapIndex];
+		switch (tap.type) {
+			case "sync":
+				if (!rethrowIfPossible) {
+					code += `var _hasError${tapIndex} = false;\n`;
+					code += "try {\n";
+				}
+				if (onResult) {
+					code += `var _result${tapIndex} = _fn${tapIndex}(${this.args({
+						before: tap.context ? "_context" : undefined
+					})});\n`;
+				} else {
+					code += `_fn${tapIndex}(${this.args({
+						before: tap.context ? "_context" : undefined
+					})});\n`;
+				}
+				if (!rethrowIfPossible) {
+					code += "} catch(_err) {\n";
+					code += `_hasError${tapIndex} = true;\n`;
+					code += onError("_err");
+					code += "}\n";
+					code += `if(!_hasError${tapIndex}) {\n`;
+				}
+				if (onResult) {
+					code += onResult(`_result${tapIndex}`);
+				}
+				if (onDone) {
+					code += onDone();
+				}
+				if (!rethrowIfPossible) {
+					code += "}\n";
+				}
+				break;
+			case "async":
+				let cbCode = "";
+				if (onResult)
+					cbCode += `(function(_err${tapIndex}, _result${tapIndex}) {\n`;
+				else cbCode += `(function(_err${tapIndex}) {\n`;
+				cbCode += `if(_err${tapIndex}) {\n`;
+				cbCode += onError(`_err${tapIndex}`);
+				cbCode += "} else {\n";
+				if (onResult) {
+					cbCode += onResult(`_result${tapIndex}`);
+				}
+				if (onDone) {
+					cbCode += onDone();
+				}
+				cbCode += "}\n";
+				cbCode += "})";
+				code += `_fn${tapIndex}(${this.args({
+					before: tap.context ? "_context" : undefined,
+					after: cbCode
+				})});\n`;
+				break;
+			case "promise":
+				code += `var _hasResult${tapIndex} = false;\n`;
+				code += `var _promise${tapIndex} = _fn${tapIndex}(${this.args({
+					before: tap.context ? "_context" : undefined
+				})});\n`;
+				code += `if (!_promise${tapIndex} || !_promise${tapIndex}.then)\n`;
+				code += `  throw new Error('Tap function (tapPromise) did not return promise (returned ' + _promise${tapIndex} + ')');\n`;
+				code += `_promise${tapIndex}.then((function(_result${tapIndex}) {\n`;
+				code += `_hasResult${tapIndex} = true;\n`;
+				if (onResult) {
+					code += onResult(`_result${tapIndex}`);
+				}
+				if (onDone) {
+					code += onDone();
+				}
+				code += `}), function(_err${tapIndex}) {\n`;
+				code += `if(_hasResult${tapIndex}) throw _err${tapIndex};\n`;
+				code += onError(`_err${tapIndex}`);
+				code += "});\n";
+				break;
+		}
+		return code;
+	}
+
+	callTapsSeries({
+		onError,
+		onResult,
+		resultReturns,
+		onDone,
+		doneReturns,
+		rethrowIfPossible
+	}) {
+		if (this.options.taps.length === 0) return onDone();
+		const firstAsync = this.options.taps.findIndex(t => t.type !== "sync");
+		const somethingReturns = resultReturns || doneReturns;
+		let code = "";
+		let current = onDone;
+		let unrollCounter = 0;
+		for (let j = this.options.taps.length - 1; j >= 0; j--) {
+			const i = j;
+			const unroll =
+				current !== onDone &&
+				(this.options.taps[i].type !== "sync" || unrollCounter++ > 20);
+			if (unroll) {
+				unrollCounter = 0;
+				code += `function _next${i}() {\n`;
+				code += current();
+				code += `}\n`;
+				current = () => `${somethingReturns ? "return " : ""}_next${i}();\n`;
+			}
+			const done = current;
+			const doneBreak = skipDone => {
+				if (skipDone) return "";
+				return onDone();
+			};
+			const content = this.callTap(i, {
+				onError: error => onError(i, error, done, doneBreak),
+				onResult:
+					onResult &&
+					(result => {
+						return onResult(i, result, done, doneBreak);
+					}),
+				onDone: !onResult && done,
+				rethrowIfPossible:
+					rethrowIfPossible && (firstAsync < 0 || i < firstAsync)
+			});
+			current = () => content;
+		}
+		code += current();
+		return code;
+	}
+
+	callTapsLooping({ onError, onDone, rethrowIfPossible }) {
+		if (this.options.taps.length === 0) return onDone();
+		const syncOnly = this.options.taps.every(t => t.type === "sync");
+		let code = "";
+		if (!syncOnly) {
+			code += "var _looper = (function() {\n";
+			code += "var _loopAsync = false;\n";
+		}
+		code += "var _loop;\n";
+		code += "do {\n";
+		code += "_loop = false;\n";
+		for (let i = 0; i < this.options.interceptors.length; i++) {
+			const interceptor = this.options.interceptors[i];
+			if (interceptor.loop) {
+				code += `${this.getInterceptor(i)}.loop(${this.args({
+					before: interceptor.context ? "_context" : undefined
+				})});\n`;
+			}
+		}
+		code += this.callTapsSeries({
+			onError,
+			onResult: (i, result, next, doneBreak) => {
+				let code = "";
+				code += `if(${result} !== undefined) {\n`;
+				code += "_loop = true;\n";
+				if (!syncOnly) code += "if(_loopAsync) _looper();\n";
+				code += doneBreak(true);
+				code += `} else {\n`;
+				code += next();
+				code += `}\n`;
+				return code;
+			},
+			onDone:
+				onDone &&
+				(() => {
+					let code = "";
+					code += "if(!_loop) {\n";
+					code += onDone();
+					code += "}\n";
+					return code;
+				}),
+			rethrowIfPossible: rethrowIfPossible && syncOnly
+		});
+		code += "} while(_loop);\n";
+		if (!syncOnly) {
+			code += "_loopAsync = true;\n";
+			code += "});\n";
+			code += "_looper();\n";
+		}
+		return code;
+	}
+
+	callTapsParallel({
+		onError,
+		onResult,
+		onDone,
+		rethrowIfPossible,
+		onTap = (i, run) => run()
+	}) {
+		if (this.options.taps.length <= 1) {
+			return this.callTapsSeries({
+				onError,
+				onResult,
+				onDone,
+				rethrowIfPossible
+			});
+		}
+		let code = "";
+		code += "do {\n";
+		code += `var _counter = ${this.options.taps.length};\n`;
+		if (onDone) {
+			code += "var _done = (function() {\n";
+			code += onDone();
+			code += "});\n";
+		}
+		for (let i = 0; i < this.options.taps.length; i++) {
+			const done = () => {
+				if (onDone) return "if(--_counter === 0) _done();\n";
+				else return "--_counter;";
+			};
+			const doneBreak = skipDone => {
+				if (skipDone || !onDone) return "_counter = 0;\n";
+				else return "_counter = 0;\n_done();\n";
+			};
+			code += "if(_counter <= 0) break;\n";
+			code += onTap(
+				i,
+				() =>
+					this.callTap(i, {
+						onError: error => {
+							let code = "";
+							code += "if(_counter > 0) {\n";
+							code += onError(i, error, done, doneBreak);
+							code += "}\n";
+							return code;
+						},
+						onResult:
+							onResult &&
+							(result => {
+								let code = "";
+								code += "if(_counter > 0) {\n";
+								code += onResult(i, result, done, doneBreak);
+								code += "}\n";
+								return code;
+							}),
+						onDone:
+							!onResult &&
+							(() => {
+								return done();
+							}),
+						rethrowIfPossible
+					}),
+				done,
+				doneBreak
+			);
+		}
+		code += "} while(false);\n";
+		return code;
+	}
+
+	args({ before, after } = {}) {
+		let allArgs = this._args;
+		if (before) allArgs = [before].concat(allArgs);
+		if (after) allArgs = allArgs.concat(after);
+		if (allArgs.length === 0) {
+			return "";
+		} else {
+			return allArgs.join(", ");
+		}
+	}
+
+	getTapFn(idx) {
+		return `_x[${idx}]`;
+	}
+
+	getTap(idx) {
+		return `_taps[${idx}]`;
+	}
+
+	getInterceptor(idx) {
+		return `_interceptors[${idx}]`;
+	}
+}
+
+module.exports = HookCodeFactory;
+```
+

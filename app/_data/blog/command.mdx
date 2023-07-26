@@ -1,0 +1,294 @@
+---
+title: "commander 和 cac"
+date: "2023-06-20"
+tags: ["node","command"]
+draft: false
+summary: 解析命令行字符串的工具, commander 和 cac。
+---
+
+## Overview
+
+<TOCInline toc={props.toc} exclude="Overview" />
+
+前期准备
+>
+>新建一个文件夹 ， 打开终端输入 npm init xxx -y ,
+>
+>在package.json 中添加可执行命令
+>
+>```json
+>{
+>    "bin":{
+>        "jef":"./index.js"
+>    }
+>}
+>```
+>
+>创建执行文件 index.js, 添加 #!/usr/bin/env node
+>
+>这时候就可以通过在控制台输入 jef 执行index.js文件。
+
+## commander.js
+
+简单使用
+
+```js
+#!/usr/bin/env node
+const { Command } = require("commander");
+
+const program = new Command();
+
+program
+  .name("string-split")
+  .description("cli to split string")
+  .version("0.0.1");
+
+program
+  .command("split")
+  .description("split a as string")
+  .argument("<string>", "string to split")
+  .option("-s, --separator <char>", "separator character")
+  .action((str, options)=>{
+    const { separator = "," } = options;
+    console.log(`the result is:`, str.split(separator));
+  });
+
+program.parse();
+```
+
+### options
+
+使用 .option() 方法定义 option
+
+~~~typescript
+// 参数
+option(flags: string, description?: string, defaultValue?: string | boolean | string[]): this;
+option<T>(flags: string, description: string, fn: (value: string, previous: T) => T, defaultValue?: T): this;
+  /** @deprecated since v7, instead use choices or a custom function */
+option(flags: string, description: string, regexp: RegExp, defaultValue?: string | boolean | string[]): this;
+~~~
+
+flag可以有简写和完整写法， 使用 逗号, 或者 空格 或者 |  隔开。
+
+
+option 的值可以是 布尔值 或者 字符串 或者 数组。
+
+默认是布尔值。 使用\<xxx\>包裹值是字符串， 使用[xxx]包裹 可以是布尔值，也可以是字符串。
+
+\<xxx...\> , \[xxx...\] option的值是一个数组。
+
+解析过的 option 会传入action的处理函数中, 也可以通过调用 command 实例的 opts 方法访问。
+
+```js
+// 使用 --no-xxx 设置 xxx 默认值 true
+program
+  .command("chip")
+  .option("--no-sauce","remove sauce")
+  .option("--cheese","cheese flavour")
+  .action((_, options)=>{
+    console.log(options.opts());
+    // input : jef chip
+    // { sauce: true }
+  });
+```
+
+也可以通过 addOption 方法 和 Option类 添加option.
+
+```js
+const { Command, Option } = require("commander");
+const program = new Command();
+program
+	.addOption(new Option("-s, --secret").hideHelp())
+```
+
+
+
+### command
+
+通过 command 方法添加指令
+
+```typescript
+// 参数
+command(nameAndArgs: string, opts?: CommandOptions): ReturnType<this['createCommand']>;
+```
+
+连续调用command 添加副指令。
+
+可以在指令名的后面添加指令的参数 ( \<xxx\>, [xxx] ), 也可以通过 argument 方法添加指令的参数。
+
+\<xxx...\>  \[xxx...\]的作用和options中的类似。
+
+### action
+
+action 方法调用处理函数
+
+```
+// 参数
+action(fn: (...args: any[]) => void | Promise<void>): this;
+```
+
+使用异步的处理函数时， 调用program的 parseAsync方法。
+
+```js
+async function run()
+
+async function main() {
+  program
+    .command('run')
+    .action(run);
+  await program.parseAsync(process.argv);
+}
+```
+
+
+
+### version
+
+使用version 方法指定版本。
+
+```js
+program.version("0.0.1")
+// input: jef -V
+// 0.0.1
+```
+
+### 帮助信息
+
+帮助信息自动生成， 通过 -h ，--help 指令展示。
+
+也可以调用 addHelpText 方法在添加信息。
+
+```typescript
+type AddHelpTextPosition = 'beforeAll' | 'before' | 'after' | 'afterAll';
+addHelpText(position: AddHelpTextPosition, text: string): this;
+addHelpText(position: AddHelpTextPosition, text: (context: AddHelpTextContext) => string): this;
+```
+
+### commander.js更多用法可以看官方文档
+
+[https://github.com/tj/commander.js](https://github.com/tj/commander.js)
+
+## cac.js
+
+简单强大的命令行字符串解析工具。和commander.js 很像。
+
+用法查看官方文档
+
+[https://github.com/cacjs/cac](https://github.com/cacjs/cac)
+
+```js
+// 内部一些函数
+const removeBrackets = (v: string) => v.replace(/[<[].+/, '').trim() 
+// 提取字符串中 [ 或者 < 之前的内容
+// "abc [sd] sfsf" => abc , "ccc <ds>ffs" => ccc
+```
+
+内部有三个主要的类
+
+CAC , Command 和 Option
+
+```js
+import CAC from './CAC'
+import Command from './Command'
+const cac = (name = '') => new CAC(name)
+
+export default cac
+export { cac, CAC, Command }
+```
+
+```js
+// 简单用法
+const cli = cac("xxx");
+cli
+  .command('rm <dir>', 'Remove a dir')
+  .option('-r, --recursive', 'Remove recursively')
+  .action((dir, options) => {
+    console.log('remove ' + dir + (options.recursive ? ' recursively' : ''))
+  })
+cli.parse();
+
+// cli.command 方法返回 Command 实例
+class CAC extends EventEmitter {
+  /**
+   * 省略代码
+   */
+  command(rawName: string, description?: string, config?: CommandConfig) {
+    const command = new Command(rawName, description || '', config, this)
+    command.globalCommand = this.globalCommand
+    this.commands.push(command)
+    return command
+  }
+}
+
+
+class Command {
+    /**
+   * 省略代码
+   */
+  // command 类的 option 方法
+ option(rawName: string, description: string, config?: OptionConfig) {
+    const option = new Option(rawName, description, config)
+    this.options.push(option)
+    return this
+  }
+}
+```
+
+
+
+```js
+// option 类 实现
+class Option {
+  /** Option name */
+  name: string
+  /** Option name and aliases */
+  names: string[]
+  isBoolean?: boolean
+  // `required` will be a boolean for options with brackets
+  required?: boolean
+  config: OptionConfig
+  negated: boolean
+
+  constructor(
+    public rawName: string,
+    public description: string,
+    config?: OptionConfig
+  ) {
+    this.config = Object.assign({}, config)
+
+    // You may use cli.option('--env.* [value]', 'desc') to denote a dot-nested option
+    rawName = rawName.replace(/\.\*/g, '')
+
+    this.negated = false
+    this.names = removeBrackets(rawName)
+      .split(',')
+      .map((v: string) => {
+        let name = v.trim().replace(/^-{1,2}/, '')
+        if (name.startsWith('no-')) {
+          this.negated = true
+          name = name.replace(/^no-/, '')
+        }
+
+        return camelcaseOptionName(name)
+      })
+      .sort((a, b) => (a.length > b.length ? 1 : -1)) // Sort names
+
+    // Use the longest name (last one) as actual option name
+    this.name = this.names[this.names.length - 1]
+
+    if (this.negated && this.config.default == null) {
+      this.config.default = true
+    }
+
+    if (rawName.includes('<')) {
+      this.required = true
+    } else if (rawName.includes('[')) {
+      this.required = false
+    } else {
+      // No arg needed, it's boolean flag
+      this.isBoolean = true
+    }
+  }
+}
+```
+
