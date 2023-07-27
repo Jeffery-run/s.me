@@ -26,7 +26,7 @@ const page = memo(() => {
   ]);
   useEffect(() => {
     const resizeHandler = debounce(150, () => {
-      playerRef.current.resize(containerRef.current?.offsetWidth, containerRef.current?.offsetHeight);
+      playerRef.current?.resize(containerRef.current?.offsetWidth, containerRef.current?.offsetHeight);
     });
     window.addEventListener('resize', resizeHandler);
     return () => {

@@ -31,6 +31,10 @@ class Visualizer {
 
   height:number;
 
+  abortController:AbortController | null;
+
+  timeStamp?:number;
+
   constructor({
     method, canvas, done, width, height,
   } : VisualizerOption) {
@@ -44,6 +48,7 @@ class Visualizer {
     this.done = done || this.done;
     this.width = width || 400;
     this.height = height || 300;
+    this.abortController = null;
     this.init();
   }
 
@@ -58,24 +63,29 @@ class Visualizer {
     }
     this.clear();
     this.playingUrl = url;
-    this.start();
+    this.timeStamp = Date.now();
+    this.start(this.timeStamp);
   }
 
-  async start() {
+  async start(stamp:number) {
     const { audioContext } = this;
     if (!audioContext) return;
-    const res = await fetch(this.playingUrl!, {
+    this.abortController = new AbortController();
+    fetch(this.playingUrl!, {
       method: this.method,
+      signal: this.abortController.signal,
+    }).then(async (res) => {
+      if (res.status >= 200 && res.status < 300) {
+        const buffer = await res.arrayBuffer();
+        audioContext.decodeAudioData(buffer, (bf) => {
+          if (this.timeStamp === stamp) this.visualize(audioContext, bf);
+        });
+      } else {
+        Visualizer.updateInfo(res.statusText);
+      }
+    }).catch((e) => {
+      Visualizer.updateInfo(e.message);
     });
-
-    if (res.status >= 200 && res.status < 300) {
-      const buffer = await res.arrayBuffer();
-      audioContext.decodeAudioData(buffer, (bf) => {
-        this.visualize(audioContext, bf);
-      });
-    } else {
-      Visualizer.updateInfo(res.statusText);
-    }
   }
 
   pause() {
@@ -106,6 +116,7 @@ class Visualizer {
   };
 
   clear() {
+    this.abortController?.abort();
     this.audioContext?.resume();
     this.stopDraw();
     this.source?.removeEventListener('ended', this.sourceListener);
