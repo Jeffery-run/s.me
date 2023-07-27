@@ -25,14 +25,6 @@ const page = memo(() => {
     { name: '一笑江湖', url: '/mp3/yxjh.mp3' },
   ]);
   useEffect(() => {
-    setTimeout(() => {
-      playerRef.current = new Visualizer({
-        canvas: canvasRef.current!,
-        done: () => setPlayIndex(-1),
-        width: containerRef.current?.offsetWidth,
-        height: containerRef.current?.offsetHeight,
-      });
-    }, 100);
     const resizeHandler = debounce(150, () => {
       playerRef.current.resize(containerRef.current?.offsetWidth, containerRef.current?.offsetHeight);
     });
@@ -43,6 +35,14 @@ const page = memo(() => {
     };
   }, []);
   const itemPlay = (item: any, index:number) => {
+    if (!playerRef.current) {
+      playerRef.current = new Visualizer({
+        canvas: canvasRef.current!,
+        done: () => setPlayIndex(-1),
+        width: containerRef.current?.offsetWidth,
+        height: containerRef.current?.offsetHeight,
+      });
+    }
     playerRef.current.play(item.url);
     setPlayIndex(index);
   };
