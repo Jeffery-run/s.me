@@ -124,8 +124,6 @@ class Visualizer {
   drawSpectrum(analyser: AnalyserNode) {
     this.resize();
     const ctx = this.canvas.getContext('2d')!;
-    ctx.fillStyle = '#ff05d6';
-    ctx.fillRect(20, 20, 100, 100);
     const gradient = ctx!.createLinearGradient(0, 0, 0, this.height);
     gradient.addColorStop(1, '#f00');
     gradient.addColorStop(0.75, '#ff0');
