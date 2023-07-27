@@ -7,6 +7,7 @@ import Image from 'next/image';
 import ThemeProv from './themeProvider';
 import MuiTheme from './_components/muiTheme';
 import NavBar from './navBar';
+import ToasterEl from './_components/Toast';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -34,6 +35,7 @@ export default function RootLayout({
             </div>
           </MuiTheme>
         </ThemeProv>
+        <ToasterEl />
       </body>
     </html>
   );

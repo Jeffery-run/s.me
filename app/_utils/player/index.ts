@@ -1,3 +1,5 @@
+import { toast } from 'react-hot-toast';
+
 type RequestType = 'get' | 'post' | 'delete' | 'put';
 type VisualizerOption = {
   method?: RequestType;
@@ -182,7 +184,7 @@ class Visualizer {
   }
 
   static updateInfo(message: string) {
-    alert(message);
+    toast(message);
   }
 }
 

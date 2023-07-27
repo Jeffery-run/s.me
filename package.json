@@ -38,6 +38,7 @@
     "postcss": "8.4.24",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "react-hot-toast": "^2.4.1",
     "rehype-autolink-headings": "^6.1.1",
     "rehype-citation": "^0.4.0",
     "rehype-katex": "^6.0.3",

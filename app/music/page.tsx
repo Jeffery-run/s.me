@@ -30,7 +30,7 @@ const page = memo(() => {
     });
     window.addEventListener('resize', resizeHandler);
     return () => {
-      playerRef.current.clear();
+      playerRef.current?.clear();
       window.removeEventListener('resize', resizeHandler);
     };
   }, []);

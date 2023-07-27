@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo } from 'react';
+import React from 'react';
 import { ThemeProvider, createTheme } from '@mui/material';
 
 const theme = createTheme({
@@ -18,8 +18,8 @@ const theme = createTheme({
   },
 });
 
-const muiTheme = memo(({ children } : { children:React.ReactNode }) => (
+const muiTheme = ({ children } : { children:React.ReactNode }) => (
   <ThemeProvider theme={theme}>{children}</ThemeProvider>
-));
+);
 
 export default muiTheme;
