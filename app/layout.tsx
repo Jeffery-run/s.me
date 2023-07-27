@@ -11,7 +11,7 @@ import NavBar from './navBar';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'jeffery.me',
+  title: 's.me',
   description: 'personal website',
 };
 
