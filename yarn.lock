@@ -2444,6 +2444,11 @@
     "css-color-keywords" "^1.0.0"
     "postcss-value-parser" "^4.0.2"
 
+"cssesc@^3.0.0":
+  "integrity" "sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg=="
+  "resolved" "https://registry.npmmirror.com/cssesc/-/cssesc-3.0.0.tgz"
+  "version" "3.0.0"
+
 "csstype@^3.0.10", "csstype@^3.0.2", "csstype@^3.1.2":
   "integrity" "sha512-I7K1Uu0MBPzaFKg4nI5Q7Vs2t+3gWWW648spaF+Rg7pI9ds18Ugn+lvg4SHczUdKlHI5LWBXyqfS8+DufyBsgQ=="
   "resolved" "https://registry.npmmirror.com/csstype/-/csstype-3.1.2.tgz"
@@ -4861,6 +4866,11 @@
   "integrity" "sha512-vqiC06CuhBTUdZH+RYl8sFrL096vA45Ok5ISO6sE/Mr1jRbGH4Csnhi8f3wKVl7x8mO4Au7Ir9D3Oyv1VYMFJw=="
   "resolved" "https://registry.npmmirror.com/mimic-fn/-/mimic-fn-4.0.0.tgz"
   "version" "4.0.0"
+
+"mini-svg-data-uri@^1.2.3", "mini-svg-data-uri@^1.4.4":
+  "integrity" "sha512-r9deDe9p5FJUPZAk3A59wGH7Ii9YrjjWw0jmw/liSbHl2CHiyXj6FcDXDu2K3TjVAXqiJdaw3xxwlZZr9E6nHg=="
+  "resolved" "https://registry.npmmirror.com/mini-svg-data-uri/-/mini-svg-data-uri-1.4.4.tgz"
+  "version" "1.4.4"
 
 "minimatch@^3.0.4", "minimatch@^3.0.5", "minimatch@^3.1.2":
   "integrity" "sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw=="
